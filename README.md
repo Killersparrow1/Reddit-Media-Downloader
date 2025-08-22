@@ -1,5 +1,7 @@
 # Reddit Media Downloader
 
+[![Screenshot.png](https://i.postimg.cc/26JffJKz/Screenshot.png)](https://postimg.cc/gXv7VMp5)
+
 A Python-based web application to download media from Reddit posts, including NSFW content.
 
 ## Features
@@ -121,3 +123,8 @@ The application will create the following directory structure:
 ```
 
 All downloaded media will be saved in the downloads directory, organized into sfw and nsfw subfolders.
+
+---
+## Acknowledgements
+
+Special thanks to DeepSeek AI and ChatGPT AI for their assistance and support in building and documenting this project.
