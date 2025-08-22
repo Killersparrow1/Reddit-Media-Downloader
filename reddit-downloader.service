@@ -1,0 +1,14 @@
+[Unit]
+Description=Reddit Media Downloader
+After=network.target
+
+[Service]
+User=milas
+WorkingDirectory=/home/milas/reddit-media-downloader
+Environment=PATH=/home/milas/reddit-media-downloader/venv/bin
+ExecStart=/home/milas/reddit-media-downloader/venv/bin/python reddit_downloader.py --host 0.0.0.0 --port 5000 --no-debug
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit Media Downloader</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Reddit Media Downloader</h1>
+            <p class="subtitle">Download media from Reddit posts including NSFW content</p>
+        </header>
+
+        <div class="main-content">
+            <div class="download-section">
+                <h2>Download Media</h2>
+                <form id="downloadForm">
+                    <div class="form-group">
+                        <label for="redditUrl">Reddit Post URL:</label>
+                        <input type="url" id="redditUrl" placeholder="https://www.reddit.com/r/..." required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="nsfwCheck">
+                            <label for="nsfwCheck">NSFW Content</label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" id="downloadBtn">Download Media</button>
+                </form>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Downloading media...</p>
+                </div>
+
+                <div class="status" id="status"></div>
+            </div>
+
+            <div class="files-section">
+                <h2>Downloaded Files</h2>
+                <button onclick="loadFiles()" style="margin-bottom: 20px;">Refresh Files</button>
+                <div class="file-list" id="fileList">
+                    <p>No files downloaded yet.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const apiBase = '/api';
+        
+        document.getElementById('downloadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const url = document.getElementById('redditUrl').value;
+            const isNsfw = document.getElementById('nsfwCheck').checked;
+            const downloadBtn = document.getElementById('downloadBtn');
+            const loading = document.getElementById('loading');
+            const status = document.getElementById('status');
+            
+            // Validate URL
+            if (!url.includes('reddit.com') && !url.includes('redd.it')) {
+                showStatus('Please enter a valid Reddit URL', 'error');
+                return;
+            }
+            
+            downloadBtn.disabled = true;
+            loading.style.display = 'block';
+            status.style.display = 'none';
+            
+            try {
+                const response = await fetch(`${apiBase}/download`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: url,
+                        nsfw: isNsfw
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus(`Success! Downloaded ${data.files.length} file(s)`, 'success');
+                    document.getElementById('redditUrl').value = '';
+                    loadFiles();
+                } else {
+                    showStatus(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus('Network error. Please try again.', 'error');
+            } finally {
+                downloadBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        });
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+        
+        async function loadFiles() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '<p>Loading files...</p>';
+            
+            try {
+                const response = await fetch(`${apiBase}/files`);
+                const data = await response.json();
+                
+                if (data.files.length === 0) {
+                    fileList.innerHTML = '<p>No files downloaded yet.</p>';
+                    return;
+                }
+                
+                fileList.innerHTML = '';
+                data.files.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    
+                    const fileInfo = document.createElement('div');
+                    fileInfo.className = 'file-info';
+                    
+                    const fileName = document.createElement('div');
+                    fileName.className = 'file-name';
+                    fileName.textContent = file.name;
+                    if (file.is_nsfw) {
+                        const nsfwBadge = document.createElement('span');
+                        nsfwBadge.className = 'nsfw-badge';
+                        nsfwBadge.textContent = 'NSFW';
+                        fileName.appendChild(nsfwBadge);
+                    }
+                    
+                    const fileSize = document.createElement('div');
+                    fileSize.className = 'file-size';
+                    fileSize.textContent = formatFileSize(file.size);
+                    
+                    fileInfo.appendChild(fileName);
+                    fileInfo.appendChild(fileSize);
+                    
+                    const fileActions = document.createElement('div');
+                    fileActions.className = 'file-actions';
+                    
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = 'btn-download';
+                    downloadBtn.textContent = 'Download';
+                    downloadBtn.onclick = () => window.open(`${apiBase}/download-file/${file.path}`, '_blank');
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn-delete';
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.onclick = () => deleteFile(file.path);
+                    
+                    fileActions.appendChild(downloadBtn);
+                    fileActions.appendChild(deleteBtn);
+                    
+                    fileItem.appendChild(fileInfo);
+                    fileItem.appendChild(fileActions);
+                    
+                    fileList.appendChild(fileItem);
+                });
+            } catch (error) {
+                fileList.innerHTML = '<p>Error loading files.</p>';
+            }
+        }
+        
+        async function deleteFile(filepath) {
+            if (!confirm('Are you sure you want to delete this file?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${apiBase}/delete-file/${filepath}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus('File deleted successfully', 'success');
+                    loadFiles();
+                } else {
+                    showStatus('Error deleting file', 'error');
+                }
+            } catch (error) {
+                showStatus('Network error', 'error');
+            }
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // Load files on page load
+        document.addEventListener('DOMContentLoaded', loadFiles);
+    </script>
+</body>
+</html>
